@@ -3,17 +3,13 @@ package com.example.bgremove
 import android.content.Context
 import android.graphics.*
 import android.os.Bundle
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.ScriptIntrinsicBlur
+import android.util.Log
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.tan
+import com.slowmac.autobackgroundremover.BackgroundRemover
+import com.slowmac.autobackgroundremover.OnBackgroundChangeListener
+import kotlin.math.*
 import kotlin.random.Random
 
 class bgremove : AppCompatActivity() {
@@ -22,12 +18,61 @@ class bgremove : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_bgremove)
         imageview = findViewById(R.id.test)
-        val bitmap = BitmapFactory.decodeResource(resources, R.drawable.ajeeb)
+        val bitmap = BitmapFactory.decodeResource(resources, R.drawable.rohit)
 //        rb(bitmap)
 //        rbgreen(bitmap)
+//        rbexpred(bitmap)
 //        grayscale(bitmap)
 //        rb(bitmap)
-        rbexpred(bitmap)
+//        removeBackgroundx(bitmap)
+
+        //GhyasAhmad function Implemntation for removing the backgournd
+        BackgroundRemover.bitmapForProcessing(
+            bitmap,
+            true,
+            object: OnBackgroundChangeListener {
+                override fun onSuccess(bitmap: Bitmap) {
+                    //bitmap
+                    imageview?.setImageBitmap(bitmap)
+                }
+
+                override fun onFailed(exception: Exception) {
+                    //exception
+                }
+            }
+        )
+    }
+
+    //get the painted image here
+    fun removeBackgroundx(bitmap: Bitmap): Bitmap {
+        val threshold = 127
+        val mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val grayBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(grayBitmap)
+        val grayPaint = Paint().apply {
+            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+        }
+        canvas.drawBitmap(bitmap, 0f, 0f, grayPaint)
+        val paint = Paint().apply {
+            color = Color.BLACK
+        }
+        val rect = Rect(0, 0, bitmap.width, bitmap.height)
+        val canvas2 = Canvas(mutableBitmap)
+        canvas2.drawRect(rect, paint)
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                val pixel = grayBitmap.getPixel(x, y)
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+                val gray = (red + green + blue) / 3
+                if (gray > threshold) {
+                    mutableBitmap.setPixel(x, y, Color.TRANSPARENT)
+                }
+            }
+        }
+        imageview?.setImageBitmap(mutableBitmap)
+        return mutableBitmap
     }
 
 
@@ -41,10 +86,9 @@ class bgremove : AppCompatActivity() {
         val paint = Paint()
         paint.colorFilter = ColorMatrixColorFilter(colorMatrix)
         canvas.drawBitmap(bitmap, 0f, 0f, paint)
-        rb(grayscaleBitmap)
-
     }
 
+    //get the painted image here
     fun rb(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
@@ -104,7 +148,7 @@ class bgremove : AppCompatActivity() {
         // Create the output bitmap
         val outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         outputBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-//        imageview?.setImageBitmap(outputBitmap)
+        imageview?.setImageBitmap(outputBitmap)
         Toast.makeText(this, "working rb", Toast.LENGTH_SHORT).show()
 //        distortImage(outputBitmap)
 
@@ -115,6 +159,8 @@ class bgremove : AppCompatActivity() {
         val width = bitmap.width
         val height = bitmap.height
 
+        var distX = 0f;
+        var distY = 0f;
         val distortedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
         val distortionFactor = 0.02f // Adjust the distortion factor as needed
@@ -123,15 +169,44 @@ class bgremove : AppCompatActivity() {
 
         for (x in 0 until width) {
             for (y in 0 until height) {
-                val distX = x + xDistortion * sin(y.toDouble() / height * 2 * PI).toFloat()
-                val distY = y + yDistortion * cos(x.toDouble() / width * 2 * PI).toFloat()
+                distX = x + xDistortion * sin(y.toDouble() / height * 2 * PI).toFloat()
+                distY = y + yDistortion * cos(x.toDouble() / width * 2 * PI).toFloat()
                 if (distX >= 0 && distX < width && distY >= 0 && distY < height) {
                     val color = bitmap.getPixel(distX.toInt(), distY.toInt())
                     distortedBitmap.setPixel(x, y, color)
                 }
             }
         }
+        Log.d("distortX", "$distX,$distY")
+//        imageview?.setImageBitmap(distortedBitmap)
+        reverseDistortImage(distortedBitmap)
+        return distortedBitmap
+    }
 
+ //write a new reverse function for distort image
+    fun reverseDistortImage(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+
+        var distX = 0f;
+        var distY = 0f;
+        val distortedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        val distortionFactor = 0.02f // Adjust the distortion factor as needed
+        val xDistortion = (width * distortionFactor).toInt()
+        val yDistortion = (height * distortionFactor).toInt()
+
+        for (x in 0 until width) {
+            for (y in 0 until height) {
+                distX = x - xDistortion * sin(1 - (y.toDouble() / height * 2 * PI)).toFloat()
+                distY = y - yDistortion * cos(x.toDouble() / width * 2 * PI).toFloat()
+                if (distX >= 0 && distX < width && distY >= 0 && distY < height) {
+                    val color = bitmap.getPixel(distX.toInt(), distY.toInt())
+                    distortedBitmap.setPixel(x, y, color)
+                }
+            }
+        }
+        Log.d("distortX", "$distX,$distY")
         imageview?.setImageBitmap(distortedBitmap)
         return distortedBitmap
     }
@@ -229,8 +304,8 @@ class bgremove : AppCompatActivity() {
         // Create the output bitmap
         val outputBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         outputBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        scatterBitmap(outputBitmap,10)
-
+//        distortImage(outputBitmap)
+        imageview?.setImageBitmap(outputBitmap)
         return outputBitmap
     }
     fun scatterBitmap(bitmap: Bitmap, amount: Int): Bitmap {
@@ -262,9 +337,38 @@ class bgremove : AppCompatActivity() {
                 outputBitmap.setPixel(x, y, color)
             }
         }
-        distortImage(outputBitmap)
+
         // Return the scattered Bitmap
         return outputBitmap
+    }
+
+    fun removeBackground(bitmap: Bitmap): Bitmap {
+        // Convert bitmap to mutable bitmap
+        val mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+
+        // Define the color to replace the background with
+        val backgroundColor = Color.TRANSPARENT
+
+        // Define the threshold for color similarity
+        val colorTolerance = 50
+
+        // Loop through every pixel in the image
+        for (x in 0 until mutableBitmap.width) {
+            for (y in 0 until mutableBitmap.height) {
+
+                // Get the color of the current pixel
+                val pixelColor = mutableBitmap.getPixel(x, y)
+
+                // Check if the color is similar to the background color
+                if (Color.red(pixelColor) < colorTolerance && Color.green(pixelColor) < colorTolerance && Color.blue(pixelColor) < colorTolerance) {
+                    mutableBitmap.setPixel(x, y, backgroundColor)
+                }
+            }
+        }
+
+        // Return the modified bitmap
+        imageview?.setImageBitmap(mutableBitmap)
+        return mutableBitmap
     }
 
 
